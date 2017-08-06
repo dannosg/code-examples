@@ -1,0 +1,13 @@
+function [k1s] = createkguesses(lastoptval,range,numpoints)
+
+    lowk1 = lastoptval - (range/2);
+    int = range/numpoints;
+    k1s = lowk1;
+
+    for j = 2:numpoints+1
+
+       k1s(j) = k1s(j-1) + int;
+
+    end
+
+end
