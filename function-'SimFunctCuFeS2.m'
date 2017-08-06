@@ -1,0 +1,29 @@
+function [Cucol] = SimFunctCuFeS2(k1, k2, Feslope, Hinitial, Hslope, totalsecs, frames, snap)
+
+    timecol = zeros(frames,1);
+    Cucol = zeros(frames,1);
+    O2_aq = 2.5E-4;
+    FeMolec = 4;
+    Culog = 0;
+
+    for i=1:totalsecs
+
+        Ferric = FerricConc(i,Feslope);
+        Proton = ProtonConc(i,Hinitial,Hslope);
+
+        r = CalcExpRate(k1,k2,Proton,O2_aq,Ferric,FeMolec);
+        Culog = Culog + r;
+
+        modulo = mod(i,snap);
+
+        if modulo == 0
+
+            k = (i/snap);
+            timecol(k) = i;
+            Cucol(k) = Culog;
+
+        end
+
+    end
+
+end
