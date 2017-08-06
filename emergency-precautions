@@ -1,0 +1,33 @@
+//Configuration Loop
+void setup() 
+{
+  // Pin 10 is Reset Pin - Write HIGH in setup 
+  digitalWrite(10, HIGH);  
+  pinMode(10,OUTPUT);
+  
+  // Pin 2 monitors ‘Emergency Stop’ switch   
+  pinMode(2,INPUT);
+   
+  // Initialize serial communication at 9600 baud rate       
+  Serial.begin(9600);
+    
+}
+
+
+// Main Program Loop
+void loop() 
+{
+
+  int lim = digitalRead(2);
+  delay(10);
+  Serial.println(lim);
+  delay(1000);
+
+  // Write LOW to RESET    
+  if (lim == 0)
+  {
+    digitalWrite(10,LOW);
+    delay(100);
+  }
+
+}
