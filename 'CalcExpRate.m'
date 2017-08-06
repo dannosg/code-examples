@@ -1,0 +1,8 @@
+function [ExpRate] = CalcExpRate(k1, k2, Proton, O2_aq, Ferric, FeMolec)
+
+    term1 = TermOne(k1,Proton,O2_aq);
+    term2 = TermTwo(k2,Ferric, FeMolec);
+
+    ExpRate = term1 + term2;
+
+end
