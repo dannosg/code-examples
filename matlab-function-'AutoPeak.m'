@@ -1,0 +1,65 @@
+%{
+Instructions:
+Section of code for automatic peak picking using red line guide.
+User is given the option in ASV_ST_Analysis of using:
+-   AutoPeak.m - (This code block) finds nearest point to intersection of red line
+-   ManualPeak.m - Uses same start position as AutoPeak but allows user to define            
+                   upper boundary of integration
+-   TwoPoint.m - Uses a straight line drawn between two user-defined points to   
+                 define integration area
+%}
+
+if a1(m1) == 'a';
+
+    sub1(:,1) = M(:,1);
+    sub1(:,2) = abs(M(:,2)-y_fit);
+    peakregion1 = sub1(403:1502,1:2);
+
+    [c1 c2] = getNElements(peakregion1(:,2),10);
+
+    inters1(:,1) = c2;
+    inters1(:,2:3) = peakregion1(c2,:);
+    [d1 d2] = min(inters1(:,2));
+
+    p2 = inters1(d2,2:3);
+    xdata1 = [p1(1) p2(1)]';
+    ydata1 = [p1(2) p2(2)]';
+
+    %find maximum I in 0-300mV peak region to define extrapolation area
+    [r1 r2] = max(M(403:403+inters1(d2,1),1));
+    peakloc1 = r2;
+    extradata1 = M(peakloc1:1800,1:2);
+
+    %Fit P1 and P2 with Line
+    y1 = polyfit(xdata1,ydata1,1);
+    linepeak = polyval(y1,r1);
+
+    %locate p2 (intersection)
+    p2x = peakloc1 + 403;
+    p2real = M(p2x,1:2);
+
+    %Define region to use trapz then use
+    peakdata2 = M(51:p2x,1:2);
+    peakdata3 = peakdata2(:,2);
+    p1real = peakdata2(1,:);
+    Qtot = 0.02*trapz(peakdata3);
+
+    %calculate area of background trapezium
+    fullVwidth = p2real(1) - p1real(1);
+    twidth = fullVwidth/0.05;
+    area = 0.5*twidth*(p1real(2)+p2real(2));
+
+    %calculate peak height etc. height is r1
+    peakV = extradata1(1,:);
+    peaksize = peakV(2) - linepeak;
+
+    %Define final parameters
+    peakcharge = Qtot - area;
+    peakarea = peakcharge/20;
+    peakposition = peakV(1,1);
+    peakheight = peaksize;
+    Vwidth = 0;
+
+    clearvars coords;
+
+    end;
