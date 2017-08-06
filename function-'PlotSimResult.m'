@@ -1,0 +1,36 @@
+function[] = PlotSimResult(Cureal,optk1,optk2,totalt,frames,snap,Feslope,Hinitial,Hslope,O2_aq,FeMolec)
+
+%Results Logging Setup
+Culog = 0;
+timecol = zeros(frames,1);
+Cucol = zeros(frames,1);
+
+for i=1:totalt
+
+    Ferric = FerricConc(i,Feslope);
+    Proton = ProtonConc(i,Hinitial,Hslope);
+
+    r = CalcExpRate(optk1,optk2,Proton,O2_aq,Ferric,FeMolec);
+    Culog = Culog + r;
+
+    modulo = mod(i,snap);
+
+    if modulo == 0
+
+        k = (i/snap);
+        timecol(k) = i;
+        Cucol(k) = Culog;
+
+    end
+
+end
+
+%Plot Comparison
+figure();
+h1 = scatter(timecol,Cureal,8,'ro');
+hold on;
+h2 = scatter(timecol,Cucol,8,'go');
+xlabel('Time, \it s');
+ylabel('[Cu], \it moldm^{-3}');
+
+end
