@@ -1,0 +1,80 @@
+%{
+Instructions:
+1. Extracts Data from Ivium Data Files and Dataset Files (.idf & .ids)
+2. Construct 'filelist' externally and call this function
+%}
+
+function [M,SW] = ExtractIviumData(filelist,counter,filetype)
+
+    p = inputParser;
+
+    defaultFileType = 'idf';
+    validFileType = {'idf','ids'}
+    checkFileType = @(x) any(validatestring(x,validFileType));
+
+    addRequired(p,'filelist',@ischar);
+    addRequired(p,'counter',@isnumeric);
+    addRequired(p,'filetype',defaultFileType,checkFileType);
+
+    parse(p,filelist,counter,filetype);
+
+    % Read in Ivium data using matched inputs
+    filename = filelist(counter).name;
+    CNCfile = fopen(filename);
+
+    % Read Whole File Line-By-Line for Data-start Marker Search
+    HL = textscan(CNCfile,'%s','delimiter','\n');
+    HL2 = [HL{:}];
+
+    % Define Data-start Marker & format into Character Array
+    PDt = 'primary_data';
+    Ad = char(PDt);
+
+    % Find the Lines Containing the Data Marker
+    PD = strfind(HL2, Ad);
+    sPD = size(PD);
+    oPD = ones(sPD);
+    strPD = num2str(oPD);
+    csPD = cellstr(strPD);
+    PD2 = strcat(PD,csPD);
+    PD3 = strcmp(PD2,csPD);
+    PD4 = +PD3;
+
+    % Define the correct markers & column formats to use (.idf/.ids)
+    if filetype = 'idf';
+        NC = find(PD4==0, 1, 'first');
+        col = '%f%f%f%s';
+    end;
+    if filetype = 'ids';
+        NC = find(PD4==0);
+        NC = NC(2:);
+        col = '%f%f%f';
+    end;
+
+    % Define Number of lines to Read & Header Lines to Data
+    NL = NC + 1;
+    ND = NC + 2;
+
+    % Define number of Sweeps
+    [Sw NA] = size(NC);
+    M = [0 0 0];
+
+    % For Each Sweep Go back to the Top of the File and Read in the Data
+    for v = 1:SW;
+
+        frewind(CNCfile);
+        NCact = textscan(CNCfile,'%f', 1, 'HeaderLines', NC(v));
+        frewind(CNCfile);
+        X = textscan(CNCfile,'%f', 1, 'HeaderLines', NL(v));
+        frewind(CNCfile);
+        data2 = textscan(CNCfile, col, X{1}, 'HeaderLines', ND(v), 'delimiter', '/t');%Read data by using number of lines to read and calc'd data header lines
+        data1 = data2(:,1:3);
+        data = cell2mat(data1);
+
+        M = vertcat(M,data)
+
+    end
+
+    fclose(CNCfile);
+
+end
