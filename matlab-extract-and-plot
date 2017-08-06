@@ -1,0 +1,76 @@
+%{
+Instructions:
+1. Extracts Data from Ivium Data Files and Dataset Files (.idf & .ids).
+2. Construct 'filelist' externally and call this function.
+3. Saves MatLab figures and writes data to .txt file.
+%}
+
+clear;
+close all;
+format long;
+
+FileList = dir('*.ids');
+k1 = size(FileList,1);
+
+for m1 = 1:k1;
+
+    %Extract data from files one file at a time
+    [m,cyc] = ExtractIviumData(FileList,k1,'ids');
+
+    [n p] = size(m);
+
+    %Get handle to filename
+    namefig = Filelist(m1).name;
+
+    %Setup plot area
+    set(0,'Units','pixels');
+    scnsize = get(0,'ScreenSize');      %screensize is [1,1,11440,900]
+    figure(1);
+    f1 = figure(1);
+    position = get(f1,'Position');       %[440 378 560 420]
+    outerpos = get(f1,'OuterPosition');  %[432 370 576 512]
+    borders = outerpos - position;       %[-8 -8 16 92]
+    edge = -borders(1)/2;
+    g = [scnsize(3)*(1/20),edge,scnsize(3)*0.95,scnsize(4)-edge]; %[left bottom width height]
+    set(f1,'OuterPosition',g);
+    d1 = axes;
+    set(d1,'FontSize',14);
+    hold on;
+    c1 = scatter(m(:,1),m(:,2),8,'s');
+    hold off;
+    title(namefig,'FontSize',20,'FontWeight','bold','Interpreter','none');
+    xlabel('Potential (V)','FontSize',18,'FontWeight','bold');
+    ylabel('Current (A)','FontSize',18,'FontWeight','bold');
+
+    savefig(f1,namefig);
+
+    G1 = strcat(namefig(1:end-4),'.txt');
+
+    % Create 1st Results File & Print Column Titles
+    resultsfile = fopen(G1,'w');
+    fprintf(resultsfile, '%s', 'Col1');
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%s', 'Col2');
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%s', 'Col3');
+    fprintf(resultsfile, '\r\n');
+
+    % Write Results Line-by-Line to Output File
+    for m2=1:n
+
+        fprintf(resultsfile, '%.6E', m(m1,1));
+        fprintf(resultsfile, '\t');
+        fprintf(resultsfile, '%.6E', m(m2,2));
+        fprintf(resultsfile, '\t');
+        fprintf(resultsfile, '%.6E', m(m2,3));
+        fprintf(resultsfile, '\r\n');
+
+    end
+
+    clearvars m cyc m2 n p;
+    clear axes;
+    close(f1);
+
+end;
+
+close all;
