@@ -1,0 +1,43 @@
+function [optk,range,smallestkdev] = IterativeFunction(kchoice,optk,initrange,numguess,itercount,k1,k2,Feslope,Hinitial,Hslope,totalt,frames,snap,Cureal)
+
+    range = initrange;
+
+    for iteration_count=1:itercount
+
+        iteration_count
+        devarray = [];
+
+        [k1s] = createkguesses(optk,range,numguess);
+
+        for guess = 1:numguess
+
+            guess
+
+            if strcmp(kchoice,'k1') == 1
+
+                %Simulate using k1 array
+                Cuguess = SimFunctCuFeS2(k1s(guess),k2,Feslope,Hinitial,Hslope,totalt,frames,snap);
+
+            else
+
+                %Simulate using k1 array
+                Cuguess = SimFunctCuFeS2(k1,k1s(guess),Feslope,Hinitial,Hslope,totalt,frames,snap);
+
+            end
+
+            %Formulate Deviations
+            totdev = MeasureDeviations(Cureal, Cuguess);
+            devarray{end+1} =  totdev;
+
+        end
+
+        %Pick out lowest deviation k1
+        devmatk = cell2mat(devarray);
+        [smallestkdev, kfindex] = min(abs(devmatk));
+        optk = k1s(kfindex);
+
+        range = range/10;
+
+    end
+
+end
