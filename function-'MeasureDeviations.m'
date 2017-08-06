@@ -1,0 +1,13 @@
+function [totdev] = MeasureDeviations(Cureal, Cuguess)
+
+    [l,m] = size(Cureal);
+    totdev = 0;
+
+    for i = 1:l
+
+        dev = Cureal(i) - Cuguess(i);
+        totdev = totdev + dev;
+
+    end
+
+end
