@@ -1,0 +1,6 @@
+function [term1] = TermOne(k1, Proton, O2_aq)
+
+    p4 = Proton^4;
+    term1 = k1*p4*O2_aq;
+
+end
