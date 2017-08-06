@@ -1,0 +1,73 @@
+%{
+Instructions:
+Section of code for 2-point peak picking without using red line guide.
+User is given the option in ASV_ST_Analysis of using:
+-   AutoPeak.m - finds nearest point to intersection of red line
+-   ManualPeak.m - Uses same start position as AutoPeak but allows user to define
+                   upper boundary of integration
+-   TwoPoint.m - (this code block) Uses a straight line drawn between two user-
+                 defined points to define integration area
+%}
+
+if a1(m1) == 't';
+
+    p1 = [pV(1) pI(1)];
+    p2 = [pV(2) pI(2)];
+    xdata = [p1(1) p2(1)]';
+    ydata = [p1(2) p2(2)]';
+
+    extradata = M(1:903,1:2);
+
+    %Fit P1 and P2 with Line
+    y1 = polyfit(xdata,ydata,1);
+    alldata(:,2) = (M(1:903,1)*y1(1))+y1(2);
+    alldata(:,1) = M(1:903,1);
+    %Fit line for full visual spectrum
+
+    %%%%%Find Intersection Afterpeak (P2)%%%%
+    %subtract, take absolute and find minima (multiple)
+    sub1(:,1) = alldata(:,1);
+    sub1(:,2) = abs(extradata(:,2)-alldata(:,2));
+    [s1 s2] = getNElements(sub1(:,2),10);
+
+    %Match with the intersections closest to p1 & p2
+    inters(:,1) = s2;
+    inters(:,2:3) = M(s2,:);
+
+    [c1 c2] = min(abs(inters(:,2)-p1(1)));
+    [d1 d2] = min(abs(inters(:,2)-p2(1)));
+
+    p1real = inters(c2,:);
+    p2real = inters(d2,:);
+
+    %Define region to use trapz then use
+    peakregion = M(p1real(1):p2real(1),1:2);
+    peakdata = peakregion(:,2);
+    Qtot = 0.02*trapz(peakdata);
+
+    %calculate area of background trapezium
+    fullVwidth = p2real(2) - p1real(2);
+    twidth = fullVwidth/0.05;
+    area = 0.5*twidth*(p1real(3)+p2real(3));
+
+    [r1 r2] = max(peakregion(:,2));
+    peakloc = r2+p1real(1);
+    peak = peakregion(r2,:);
+
+    %calculate peak height etc. height is r1
+    linepeak = polyval(y1,peak(1));
+    peaksize = peak(2) - linepeak;
+
+    %Define final parameters
+    peakcharge = Qtot - area;
+    peakarea = peakcharge/20;
+    peakposition = M(p1real(1)+r2,1);
+    peakheight = peaksize;
+    Vwidth = 0;
+
+    close all;
+
+
+    clearvars coords;
+
+end
