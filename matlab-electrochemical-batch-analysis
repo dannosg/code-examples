@@ -1,0 +1,90 @@
+%{
+Instructions:
+1. Run this code in a directory containing Ivium electrodeposition traces
+2. Files should have .idf extension
+3. User is prompted to give title to results file (any string, no extension)
+4. Produces a .txt results file containing:
+    - 'File ID':    File Identifier
+    - 'ED Time':    Total Electrodeposition Time (s)
+    - 'Istart':     First Current Measured (A)
+    - 'Iend':       Current Measured at 'ED Time' (A)
+    - 'Qtot':       Total Charge Integral Under i-t Trace (C)
+    - 'Qnet':       'Qtot' (as above) Minus Rectangular Background
+                    i.e. (0,0)-(Iend,0)-(Iend,ED Time)-(0,ED Time)
+%}
+
+clear;
+close all;
+format long;
+
+% Ask user for Results File name
+G = input('Please Name the Results File...[any string]: ','s');
+
+% Compile List of Electrodeposition Files and Generate For Loop Count k
+FileList = dir('*.idf');
+k = size(FileList,1);
+
+% Initialise Array to Populate with Results
+results = zeros(k,5);
+
+% Main Program Loop
+for m1 = 1:k;
+
+    % Extract Data from Each File
+    ExtractIviumData(FileList,m1,'idf');
+
+    % Define Output Parameters
+    EDtime = M(X{1},1);
+    Istart = M(1,2);
+    Iend = M(X{1},2);
+    I = M(:,2);
+    int = M(2,1) - M(1,1);
+    Qtot = int*trapz(I);
+    Iadj = I-Iend;
+    Qnet = int*trapz(Iadj);
+
+    % Populate Appropriate Line of Results Array
+    results(m1,1) = EDtime;
+    results(m1,2) = Istart;
+    results(m1,3) = Iend;
+    results(m1,4) = Qtot;
+    results(m1,5) = Qnet;
+
+end;
+
+% Create Results File & Print Column Titles
+resultsfile = fopen(G,'w');
+fprintf(resultsfile, '%s', 'File ID');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'ED Time');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Istart');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Iend');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Qtot');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Qnet');
+fprintf(resultsfile, '\r\n');
+
+% Write Results Line-by-Line to Output File
+for m1=1:k
+
+    fprintf(resultsfile, '%s', FileList(m1).name);
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.0f', results(m1,1));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,2));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,3));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,4));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,5));
+    fprintf(resultsfile, '\r\n');
+
+end
+
+% Close Results File
+fclose(resultsfile);
+close all;
