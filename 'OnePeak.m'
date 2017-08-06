@@ -1,0 +1,113 @@
+%{
+Instructions:
+Use as part of ASV_ST_Analysis.m and duplicate/use TwoPeak.m to find multiple peaks per file
+%}
+
+function OnePeak(filelist,counter,filetype)
+
+    l = inputParser;
+
+    defaultFileType = 'idf';
+    validFileType = {'idf','ids'}
+    checkFileType = @(x) any(validatestring(x,validFileType));
+
+    addRequired(l,'filelist',@ischar);
+    addRequired(l,'counter',@isnumeric);
+    addRequired(l,'filetype',defaultFileType,checkFileType);
+
+    parse(l,filelist,counter,filetype);
+
+    % Extract all data from Ivium dataset file
+    ExtractIviumData(filelist,counter,filetype);
+
+    bgdata = M(53:253,1:2);
+    p1 = M(203,1:2);
+
+    % Visualise 1st Sweep Data in plot
+    h = figure(1);
+    set(h, 'Position', [1200 50 500 900])
+    h1 = plot(M(:,1),M(:,2));
+    title(filename,'interpreter','none');
+    xlim([-0.3 1.2]);
+        hold on;
+    coef_fit = polyfit(bgdata(:,1),bgdata(:,2),1);
+    y_fit = polyval(coef_fit,M(:,1));
+    h2 = plot(M(:,1),y_fit,'r');
+
+    % User Input of Peak-Picking Method
+    e1 = false;
+
+    while e1 == false;
+
+        a2(m1) = input('Method: a = Auto; m = Manual; t = TwoPoint - ','s');
+        a1(m1) = a2(1,m1);
+
+        if a1(m1) == 'a' || a1(m1) == 'm' || a1(m1) == 't';
+
+            e1 = true;
+
+        end
+
+    end
+
+    % User input of Parameters for Peak Picking
+    userhappy= false;
+
+    if a1(m1) == 'a';
+
+        userhappy = true;
+
+    end
+
+    while userhappy == false;
+
+        if a1(m1) == 'm';
+
+            [p1V p1I] = ginput(1);
+            h3 = scatter(p1V,p1I);
+
+            a2 = input('Continue? ','s');
+
+        end
+
+        if a2 == 'y';
+
+            userhappy = true;
+
+        end;
+
+    end;
+
+    if a1(m1) == 't';
+
+    [pV pI] = ginput(2);
+    h3 = scatter(pV,pI);
+
+    a2 = input('Continue?','s');
+    if a2 == 'y';
+
+        userhappy = true;
+
+    end
+    end
+
+
+        end;
+            hold off;
+
+        if a1(m1) == 'a';
+        AutoPeak;
+        end
+        if a1(m1) == 'm';
+        ManualPeak;
+        end
+        if a1(m1) == 't';
+        TwoPointV1;
+        end
+        results(m1,1) = peakposition;
+        results(m1,2) = peakheight;
+        results(m1,3) = Vwidth;
+        results(m1,4) = peakarea;
+        results(m1,5) = peakcharge;
+
+end
