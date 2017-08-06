@@ -1,0 +1,5 @@
+function [proton] = ProtonConc(time, initconc, rate)
+
+    proton = (time*rate) + initconc;
+
+end
