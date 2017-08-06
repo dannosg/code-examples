@@ -1,0 +1,5 @@
+function [ferric] = FerricConc(time, rate)
+
+    ferric = (time*rate);
+
+end
