@@ -1,0 +1,92 @@
+clear;
+close all;
+
+%State Assumptions
+O2_aq = 2.5E-4;
+FeMolec = 1;
+
+%Set simulation time
+totalt = input('State simulation time (secs) - '); %2.5E6;
+frames = input('State number of sampled frames - '); %1000;
+
+%Curve Simulation Parameters
+tstep = 1;
+t = 0;
+snap = round(totalt/frames);
+j=0;
+
+%Results Logging Setup
+Culog = 0;
+timecol = zeros(frames,1);
+Cucol = zeros(frames,1);
+
+%Load Parameters & Initial Rate Constant Guesses
+q = input('Which file parameters do you want to load? e.g. ParaH2SO4R1 - ', 's');
+callparameters = str2func(q);
+[y0, a1, a2, b1, b2, Hslope, Hinitial, Feslope, k1, k2] = callparameters();
+
+k1
+k2
+
+%Overwrite k1/k2
+ow1 = input('Overwrite k1 value? [y/n] - ','s');
+if ow1 =='y'
+
+    k1 = input('New k1 value = ');
+
+end
+
+ow2 = input('Overwrite k2 value? [y/n] - ','s');
+if ow2 =='y'
+
+    k2 = input('New k2 value = ');
+
+end
+
+retard = input('Reduce dCu/dt over what timescale? - ');
+steadystate = input('State steady state k1 - ');
+
+logdiffk1 = log(k1) - log(steadystate);
+redpersec = logdiffk1 / retard;
+
+for i=1:totalt
+
+    Ferric = FerricConc(i,Feslope);
+    Proton = ProtonConc(i,Hinitial,Hslope);
+
+    red = i*redpersec;
+    k1adj = k1*exp(-red);
+
+    if k1adj < steadystate
+
+        k1adj = steadystate;
+
+    end
+
+    r = CalcExpRate(k1adj,k2,Proton,O2_aq,Ferric,FeMolec);
+    Culog = Culog + r;
+
+    modulo = mod(i,snap);
+
+    if modulo == 0
+
+
+        k = (i/snap);
+        timecol(k) = i;
+        Cucol(k) = Culog;
+
+    end
+
+
+end
+
+%Build Cu vs t Curve for comparison
+[x,y] = BuildCuPlot(y0,a1,a2,b1,b2,totalt,frames);
+
+%Plot Comparison
+f1 = figure();
+h1 = scatter(x,y,8,'ro');
+hold on;
+h2 = scatter(timecol,Cucol,8,'go');
+xlabel('Time, \it s');
+ylabel('[Cu], \it moldm^{-3}');
