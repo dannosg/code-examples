@@ -1,0 +1,60 @@
+clear;
+close all;
+
+%State Assumptions
+O2_aq = 2.5E-4;
+FeMolec = 4;
+
+%Default Curve Simulation Parameters
+totalt = 1E6;
+tstep = 1;
+frames = 100;
+
+%Set Curve Simulation Parameters
+totalt = input('Total Simulation Time (seconds) = ');
+tstep = input('Time step (seconds) = ');
+frames = input('Recorded frames = ');
+guesses = input('Number of guesses per optimisation cycle = ');
+itcount = input('Number of iteration cycles = ');
+t = 0;
+snap = round(totalt/frames);
+j=0;
+
+%Results Logging Setup
+Culog = 0;
+timecol = zeros(frames,1);
+Cucol = zeros(frames,1);
+
+%Load Parameters & Initial Rate Constant Guesses
+q = input('Which file parameters do you want to load? e.g. ParaH2SO4R1 - ', 's');
+callparameters = str2func(q);
+[y0, a1, a2, b1, b2, Hslope, Hinitial, Feslope, k1, k2] = callparameters();
+
+%Magnitude Survey for k1
+[optk1,smallestdevk1,rangek1,Cureal] = MagnitudeSurvey('k1',k1,k2,y0,a1,a2,b1,b2,Feslope,Hinitial,Hslope,totalt,frames,snap);
+
+%Iterate to solve for k1
+[optk1,rangek1,smallestdevk1] = IterativeFunction('k1',optk1,rangek1,guesses,itcount,k1,k2,Feslope,Hinitial,Hslope,totalt,frames,snap,Cureal);
+
+%Magnitude Survey for k2
+[optk2,smallestdevk2,rangek2,Cureal] = MagnitudeSurvey('k2',k1,k2,y0,a1,a2,b1,b2,Feslope,Hinitial,Hslope,totalt,frames,snap);
+
+%Iterate to solve for k2
+[optk2,rangek2,smallestdevk2] = IterativeFunction('k2',optk2,rangek2,guesses,itcount,k1,k2,Feslope,Hinitial,Hslope,totalt,frames,snap,Cureal);
+
+optk1
+optk2
+
+x = input('Do you want to use k2? [y/n] - ','s');
+
+if x == 'y'
+
+    %Plot Simulation Result
+    PlotSimResult(Cureal,optk1,optk2,totalt,frames,snap,Feslope,Hinitial,Hslope,O2_aq,FeMolec);
+
+else
+
+    %Plot Simulation Result
+    PlotSimResult(Cureal,optk1,k2,totalt,frames,snap,Feslope,Hinitial,Hslope,O2_aq,FeMolec);
+
+end
