@@ -1,0 +1,6 @@
+function [term2] = TermTwo(k2, Ferric, molecularity)
+
+    F = Ferric^molecularity;
+    term2 = k2*F;
+
+end
