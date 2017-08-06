@@ -1,0 +1,565 @@
+/* Authors: Daniel Godfrey & James Bannock
+For use with Permission and appropriate training only
+
+Instructions:
+- ICE use Emergency Stop button
+- A back-up copy of the code can be found here: Desktop > Arduino > Backup
+- Once the firmware has been uploaded (below), LabView Vis exist for functions below:
+- All subvi-s are located at Desktop > LabView VIs....
+e.g. 
+- Go to any vial from any stored position using:   	'GoToVial.vi'
+- Motor speeds can be changed using a sub-vi called:  	'ChangeSpeed.vi'
+- Perform auto-homing procedure to set (0,0,0): 	‘AutomaticHoming.vi’
+
+Arduino Serial Port Assignment:
+- Start > Control Panel > System > Device Manager > Ports (COM & LPT)
+- Find the “CNC Motors” port on the instrument control box and detach the USB cable
+- In device manager, one port will disappear labelled “COMX”
+- Plug USB back in and confirm that “COMX” reappears in the list
+
+Firmware Upload:
+- Check for "Arduino Uno on COMX" with correct port (found above) at bottom-right of window
+- If incorrect, go to Tools > Board... and Tools > Serial Port...
+- Once correct, upload the firmware using the appropriate controls above
+
+Set (0,0,0) Reference Position:
+- (After uploading firmware...)
+- Open the Serial Command window, type @ ('at' symbol) and hit the Return key
+- The probe will automatically find and save a consistent reference position
+- Make sure the sample holder is correctly positioned below the probe mount
+
+Functions: (Advanced Users Only)
+
+X,Y,Z 
+- Moves motors to X,Y,Z position relative to 0,0,0  
+- e.g. 5000,_,5000
+- Do not exceed maximum values
+- Maximum values are 32500,22000,8000
+- ‘_’ character is used to maintain last axis position (e.g. in above command y will not move) 
+- Firmware returns ‘1’ when 3 motor motions are complete
+
+&X,Y,Z 
+- Virtual movement 
+- e.g. &5000,5000,5000
+- Stores X,Y,Z as new position with no physical movement 
+- Returns ‘1’ instantly
+
+!float
+- Adjust motor speed (float = 0.1 – 1; Default = 0.2)
+- e.g. !0.95
+- Decimal (float) number of 2dp is accepted.
+- ,,,\n is returned if correctly set
+ 
+?int
+- Adjust acceleration steps (int = 0-1000[+]; Default = 100)
+- e.g. ?100
+- Integer must be entered
+- ,,,\n is returned if correctly set
+
+#
+- Write current probe positions to Serial buffer
+- Used for troubleshooting only - of no use in LabView
+e.g. - when # is sent over the Serial Command window the followings is returned
+X = 1000
+Y = 2050
+Z = 7000
+
+@
+- Use limit switches to activate automatic procedure to set (0,0,0) position
+*/
+
+// Access EEPROM Memory, Maths Functions and I/O Options
+#include <EEPROM.h> 
+#include <math.h> 
+#include <stdio.h> 
+
+// Set wired digital pins from Arduino to Motor Drivers - X, Y, Z
+const int dir[] = {10, 7, 4, 2}; 
+const int stepp[] = {9, 6, 5, 3};
+const int limitp[] = {13, 12, 8};
+
+// Define and initialise some global variables
+int moveto = -1;
+int command = 0;
+float vel = 0.2;
+float vel1 = 0;
+int acc = 100;
+int acc1 = 0;
+
+// Configuration options run once upon firmware upload
+void setup() {
+
+  // Activate pins for all 4 motors (for loop with zero-indexed integer i)
+  for (int i = 0; i < 4; i++)
+  {
+    pinMode(dir[i], OUTPUT);
+    pinMode(stepp[i], OUTPUT);
+  }
+
+  //Activate pins to read limit switches for automatic 0,0,0 positioning
+  for (int k = 0; k < 3; k++)
+  {
+    pinMode(limitp[k], INPUT);
+  }
+  
+  // Begin serial communication with 9600 baud rate
+  Serial.begin(9600);
+
+} 
+// Setup(): Closed
+
+// Main Program: Open
+void loop() 
+{ 
+  // Initialise common variables
+  int value = 0;
+  int denom = 0;
+
+  // Look for data on the serial buffer
+  if (Serial.available() > 0)
+  {
+    
+    // Isolate character commands for special functions e.g. auto-homing, change speed etc.
+    if (Serial.peek()=='!'||Serial.peek()=='?'||Serial.peek()=='@'||Serial.peek()=='#') 
+    {
+      
+      // Set rotation direction for auto-homing & initialise reading parameters to zero
+      int choice = Serial.read();
+      vel1 = 0;
+      acc1 = 0;
+      int rotdir[] = {-2, 2, 2};
+
+      // If you find the ASCII character for '#' - Print the stored position
+      if (choice == 35)
+      {
+        int hash = Serial.read();
+        int mot[] = {0,0,0};
+        int powers_[] = {10000, 1000, 100, 10, 1};
+        
+        for (int n = 0; n < 5; n++)                                  
+        {
+          mot[0] = (EEPROM.read(3 * n) * powers_[n]) + mot[0];
+          mot[1] = (EEPROM.read((3 * n) + 1) * powers_[n]) + mot[1];
+          mot[2] = (EEPROM.read((3 * n) + 2) * powers_[n]) + mot[2];
+        }
+
+        Serial.print("\nX = ");
+        Serial.print(mot[0]);
+        Serial.print("\nY = ");
+        Serial.print(mot[1]);
+        Serial.print("\nZ = ");
+        Serial.print(mot[2]);
+        Serial.print("\n");
+
+        // Flush the serial port - Serial.flush() doesn’t work
+        byte w = 0;
+                  
+        for (int i = 0; i < 10; i++)
+        {
+          while (Serial.available() > 0)
+          {
+            char k = Serial.read();
+            w++;
+            delay(1);
+          }
+          delay(1);
+        }
+      
+      }
+            
+      // If you find the ASCII character for '@' – Auto-define zero using limit switches
+      if (choice == 64)
+      {
+        int at = Serial.read();
+        
+        //Drive each axis until limit switch engages
+        for (int j = 0; j<3; j++)
+        {
+          boolean lim = false;
+          digitalWrite(limitp[j], LOW);
+          delay(200);
+                              
+          while (lim == false)
+          {
+            lim = (digitalRead(limitp[j]) == HIGH)? true : false;
+            rotate(rotdir[j], 0.3, stepp[j + 1], dir[j + 1]);
+          }
+          
+          delay(200);
+          
+            // When Y-axis limit is reached, move 24520 steps in -ve direction
+            if (j==1)
+            {
+              for (int y = 0; y < 24520; y++)
+              {
+                rotate(-rotdir[j], 0.3, stepp[j + 1], dir[j + 1]);
+              }
+            }
+  
+            // When Z-axis limit is reached then move 7800 steps in the -ve direction
+            if (j==2)
+            {
+              for (int z = 0; z < 7800; z++)
+              {
+                rotate(-rotdir[j], 0.3, stepp[j + 1], dir[j + 1]);
+              }
+            }
+          delay(200);
+        }
+
+        // Write these new found positions to EEPROM memory
+        for (int n = 0; n<5; n++) 
+        {
+          EEPROM.write(3*n,0); 
+          EEPROM.write(3*n+1,0); 
+          EEPROM.write(3*n+2,0); 
+        }
+        
+        // Send a command to LabView to signify completed action
+        Serial.print("_,_,_\n");
+        
+        // Flush the serial port - Serial.flush() doesn’t work
+        byte w = 0;
+                  
+        for (int i = 0; i < 10; i++)
+        {
+          while (Serial.available() > 0)
+          {
+            char k = Serial.read();
+            w++;
+            delay(1);
+          }
+          delay(1);
+        }
+      
+      }
+            
+      // If you find the ASCII character for '!' - Change Motor Speed
+      if (choice == 33) 
+      {     
+          int ex = Serial.read();
+          while(!Serial.available());                 
+          vel1 = Serial.parseFloat(); 
+          delay(10);
+
+          // Change Motor Speed and send a command to LabView to signify completed action
+          if (vel1 > 0) {
+            Serial.print("_,_,_\n");   
+            vel = vel1;
+          }
+          else {
+          }
+          
+          // Flush the serial port - Serial.flush() doesn’t work
+          byte w = 0;
+                    
+          for (int i = 0; i < 10; i++)
+          {
+            while (Serial.available() > 0)
+            {
+              char k = Serial.read();
+              w++;
+              delay(1);
+            }
+            delay(1);
+          }
+
+      }
+
+      // If you find the ASCII character for ‘?’ - Change Acceleration Steps
+      if (choice == 63) 
+      { 
+
+          int qu = Serial.read();
+          while(!Serial.available());
+          acc1 = Serial.parseInt();  
+          delay(10);
+
+          // Change Acceleration and send a command to LabView to signify completed action
+          if (acc1 > 0) {
+            Serial.print("_,_,_\n");
+            acc = acc1;
+          }
+          else {
+          }
+          
+          // Flush the serial port - Serial.flush() doesn’t work
+          byte w = 0;
+
+          for (int i = 0; i < 10; i++)
+          {
+            while (Serial.available() > 0)
+            {
+              char k = Serial.read();
+              w++;
+              delay(1);
+            }
+            delay(1);
+          }
+
+      }
+
+    }
+    
+    // Instructions if command does not start with ? or !
+    else 
+    {
+
+      if (Serial.available() > 2) 
+      { 
+
+        // Initialise arrays for positions / multipliers / virtual movements
+        int counter = 0;
+        int delta = 0;
+        unsigned int post[] = {0, 0, 0};
+        int powers_[] = {10000, 1000, 100, 10, 1};     
+        int mot[] = {0, 0, 0};                     
+        int stay[] = {0, 0, 0};
+        int disc = 0;
+        int virt = 0;
+
+        // If command starts with ‘&’ – discard '&' and mark it as a virtual movement
+        if (Serial.peek() == '&')
+        {
+          disc = Serial.read();
+          virt = 1;
+        }
+
+        else{
+        }
+          
+        // Recall current probe position from EEPROM memory
+        for (int n = 0; n < 5; n++)                                  
+        {
+          mot[0] = (EEPROM.read(3 * n) * powers_[n]) + mot[0];
+          mot[1] = (EEPROM.read((3 * n) + 1) * powers_[n]) + mot[1];
+          mot[2] = (EEPROM.read((3 * n) + 2) * powers_[n]) + mot[2];
+        }
+
+        //Construct position to move to in each axis (for loop with zero-indexed integer m)
+        for (int m = 0; m < 3; m++)                
+        { 
+
+          int feed[] = {-1, -1, -1, -1, -1};        
+          int value = 0;
+          int t = 0;
+                   
+          // Extract desired X,Y,Z positions with up to 5 digits (ignore LF and ,)            
+          for (t; t < 5; t++)                       
+          {
+            delay(5);                              
+            value = Serial.read();                
+            if (value == ',' || value == 10) 
+            {
+              break;                               
+            }
+            if (t == 4) 
+            {
+              int handle2 = Serial.read();         
+            }
+            if (m == 2 && t == 4) 
+            {
+              int handle2 = Serial.read();        
+            }
+            
+            //If X,Y or Z is ‘_’ then write 1 to ‘stay’ array (marker for no movement req.)
+            if (value == '_')
+            {
+              stay[m] = 1;
+            }
+
+            // Convert ASCII array to numeric array
+            feed[t] = value - 48;
+          
+          }
+  
+          int pos = 0;                        
+          int j = 0;
+            
+          // Compile t (0-5) elements of the feed command into a number (using multipliers)
+          switch (t) 
+          {
+  
+              case 5: 
+                pos = 10000*feed[0] + 1000*feed[1] + 100*feed[2] + 10*feed[3] + feed[4];
+                break;
+  
+              case 4: 
+                pos = 1000 * feed[0] + 100 * feed[1] + 10 * feed[2] + feed[3];
+                break;
+  
+              case 3: 
+                pos = 100 * feed[0] + 10 * feed[1] + feed[2];
+                break;
+  
+              case 2: 
+                pos = 10 * feed[0] + feed[1];
+                break;
+
+              // ‘_’ changes stay[m] to 1 i.e. use current position – check for this first
+              case 1:
+              {
+                if (stay[m] > 0)
+                {
+                  pos = mot[m];
+                }
+                else{
+                  pos = feed[0];
+                }
+                break;
+              }
+  
+              case 0: 
+                break;
+  
+          }
+
+          // Recompile desired position (post = X | Y | Z)  
+          post[m] = pos;
+                                     
+        }
+        // Movement in each axis closed
+          
+        // Flush the serial port - Serial.flush() doesn’t work
+        byte w = 0;
+
+        for (int i = 0; i < 10; i++)
+        {
+          while (Serial.available() > 0)
+          {
+            char k = Serial.read();
+            w++;
+            delay(1);
+          }
+          delay(1);
+        }
+
+        int del[] = {0, 0, 0};           
+
+        // For each axis, calculate movement required - del[q] (zero for virtual/stay)
+        for (int q = 0; q < 3; q++)      
+        {
+          del[q] = post[q] - mot[q];
+          
+          // Set positional change to zero for virtual movements and '_' axis commands
+          if (stay[q] > 0 || virt == 1)
+          {
+            del[q] = 0;
+          }
+
+          // If a ‘real’ movement is required, turn the motors appropriately
+          if (del[q] != 0)
+          {
+
+            for (int y = 0; y < abs(del[q]); y++)
+            {
+
+              // Setup speed-dependent accel., accel. parameters and minimum motor speed
+              int acc2 = acc * (vel/0.2);          
+              float min_vel = 0.05;                
+              float cur_vel = 0;                   
+              int decel_y = abs(del[q]) - acc2;    
+
+              // If too many acceleration steps required use slow constant speed of 0.2
+              if (2*acc2 >= abs(del[q]))
+              {
+                cur_vel = 0.2;
+              }
+
+              // Otherwise define velocity at all time points
+              else
+              {
+                cur_vel = (y<acc2)? vel*((float)y + 1)/(float)acc2 : vel;                  
+                cur_vel = (y>decel_y-1)? vel*((float)acc2-((float)y-(float)decel_y))/(float)acc2:cur_vel;
+
+                // Enforce velocity limits
+                cur_vel = (cur_vel < min_vel)? min_vel : cur_vel;      
+                cur_vel = (cur_vel > vel)? vel : cur_vel;               
+              }
+              
+              //Employ ‘rotate’ function to turn motors - 2 µsteps = below 32,767 int limit
+              if (del[q] > 0) 
+              {
+                rotate(2, cur_vel, stepp[q + 1], dir[q + 1]);
+              }
+              else{
+                rotate(-2, cur_vel, stepp[q + 1], dir[q + 1]);
+              }
+               
+            }
+
+          }
+
+        }
+
+        // Print ‘1’ when movement is complete (virtual or real)
+        Serial.print(1);
+                
+        int temp;
+    
+        // Write new position to EEPROM memory – overwriting previous location data
+        for (int n = 0; n < 4; n++) 
+        {
+          
+          temp = floor(post[0] / powers_[n]);
+          EEPROM.write(3 * n, temp);
+          post[0] = post[0] - temp * powers_[n];
+    
+          temp = floor(post[1] / powers_[n]);
+          EEPROM.write(3 * n + 1, temp);
+          post[1] = post[1] - temp * powers_[n];
+    
+          temp = floor(post[2] / powers_[n]);
+          EEPROM.write(3 * n + 2, temp);
+          post[2] = post[2] - temp * powers_[n];
+    
+	 // For the final digit write remainder of position / 10 using modulo operator
+          if (n == 3)
+          {
+
+            EEPROM.write(3 * (n + 1), floor(post[0] % 10));       
+            EEPROM.write(3 * (n + 1) + 1, floor(post[1] % 10));   
+            EEPROM.write(3 * (n + 1) + 2, floor(post[2] % 10));  
+ 
+          }
+    
+        }
+          
+      }
+      // Serial.Available() > 2: Closed
+
+    }
+    // Else Statement: Closed
+
+  }
+  // Serial.Available() > 0: Closed
+
+}
+// Main Program: Closed 
+        
+        
+// Configuration of custom function: ‘rotate' (no data returned)
+void rotate(int steps, float s_vel, int step_pin, int dir_pin)
+{
+  
+  // Set direction of motion and write to direction pin
+  int dir = (steps > 0) ? HIGH : LOW;
+  digitalWrite(dir_pin, dir);
+
+  // Set absolute number of steps (direction independent)
+  steps = abs(steps);
+  
+  // Set delay times to define motor speed
+  for (int i = 0; i<steps;i++)
+  {
+      
+    digitalWrite(step_pin, HIGH);
+    delayMicroseconds(round((1 / s_vel) * 70));
+
+    digitalWrite(step_pin, LOW);
+    delayMicroseconds(round((1 / s_vel) * 70));
+   
+  }
+
+  
+}
