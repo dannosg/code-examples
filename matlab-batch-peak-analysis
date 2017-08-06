@@ -1,0 +1,119 @@
+%{
+Instructions:
+1. Run this code in a directory containing Ivium CV stripping datasets
+2. Files can be analysed for key peak statistics for up to two peaks
+2. Files should have .ids extension
+3. User is prompted to give title to results file (any string, no extension)
+4. Produces (up to) two .txt results file containing:
+    - 'File ID':		File Identifier
+    - 'Int. Method':	Choice of peak-picking method (auto/1-point/2-point)
+    - 'Peak V':		Potential of maximum current (in reference to baseline)(V)
+    - 'Peak I':		Value of current at Vmax (in reference to baseline)(A)
+    - 'Peak Area':	i-V peak area (AV)
+    - 'Peak Charge':	i-t integral of peak to give stripping charge (C)
+%}
+
+clear;
+close all;
+format long;
+
+% Ask user for Results File name
+G1 = input('Please Name the Primary Results File...[any string]: ','s');
+G2 = input('Please Name the Secondary Results File...[any string]: ','s');
+
+% Compile List of CV Dataset Files and Generate For Loop Count k
+FileList = dir('*.ids');
+k = size(FileList,1);
+
+% Initialise Arrays to Populate with Results
+results = zeros(k,4);
+results1 = zeros(k,4);
+
+% Main Program Loop
+for m1 = 1:k;
+
+    % 1st Peak: Visual trace and pick peak
+    OnePeak
+
+    % Ask the user if there is another peak to analyse [y/n]
+    z1(m1) = input('Another Peak? [y/n] - ','s');
+
+    % If affirmative, 2nd Peak: Visualise trace and pick peak
+    if z1(m1) == 'y';
+
+        TwoPeak
+
+    end;
+
+end
+
+% Create 1st Results File & Print Column Titles
+resultsfile = fopen(G1,'w');
+fprintf(resultsfile, '%s', 'File ID');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Int. Method');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Peak V');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Peak I');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Peak Area');
+fprintf(resultsfile, '\t');
+fprintf(resultsfile, '%s', 'Peak Charge');
+fprintf(resultsfile, '\r\n');
+
+% Write Results Line-by-Line to Output File
+for m1=1:k
+
+    fprintf(resultsfile, '%s', FileList(m1).name);
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%s', a1(m1));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3f', results(m1,1));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,2));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,3));
+    fprintf(resultsfile, '\t');
+    fprintf(resultsfile, '%.3E', results(m1,4));
+    fprintf(resultsfile, '\r\n');
+
+end
+
+fclose(resultsfile);
+
+% Create 2nd Results File & Print Column Titles
+resultsfile1 = fopen(G2,'w');
+fprintf(resultsfile1, '%s', 'File ID');
+fprintf(resultsfile1, '\t');
+fprintf(resultsfile1, '%s', 'Int. Method');
+fprintf(resultsfile1, '\t');
+fprintf(resultsfile1, '%s', 'Peak V');
+fprintf(resultsfile1, '\t');
+fprintf(resultsfile1, '%s', 'Peak I');
+fprintf(resultsfile1, '\t');
+fprintf(resultsfile1, '%s', 'Peak Area');
+fprintf(resultsfile1, '\t');
+fprintf(resultsfile1, '%s', 'Peak Charge');
+fprintf(resultsfile1, '\r\n');
+
+% Write Results Line-by-Line to Output File
+for m1=1:k
+
+    fprintf(resultsfile1, '%s', FileList(m1).name);
+    fprintf(resultsfile1, '\t');
+    fprintf(resultsfile1, '%s', z1(m1));
+    fprintf(resultsfile1, '\t');
+    fprintf(resultsfile1, '%.3f', results1(m1,1));
+    fprintf(resultsfile1, '\t');
+    fprintf(resultsfile1, '%.3E', results1(m1,2));
+    fprintf(resultsfile1, '\t');
+    fprintf(resultsfile1, '%.3E', results1(m1,3));
+    fprintf(resultsfile1, '\t');
+    fprintf(resultsfile1, '%.3E', results1(m1,4));
+    fprintf(resultsfile1, '\r\n');
+
+end
+
+fclose(resultsfile1);
+close all;
