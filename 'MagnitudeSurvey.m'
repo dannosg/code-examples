@@ -1,0 +1,76 @@
+function [optk,smallestk,range,Cureal] = MagnitudeSurvey(kchoice,k1,k2,y0,a1,a2,b1,b2,Feslope,Hinitial,Hslope,totalt,frames,snap)
+
+    %Form interval-ed array of k1, k2 guesses - try 100 k1 from magnitude
+    if strcmp(kchoice,'k1') == 1
+
+        kmin = input('Begin by varying k1 between:\nMin (10^x) = ');
+        kmax = input('Max (10^x) = ');
+        logrange = kmax - kmin +1;
+        lowklim = 10^kmin;
+
+    else
+
+        kmin = input('Begin by varying k2 between:\nMin (10^x) = ');
+        kmax = input('Max (10^x) = ');
+        logrange = kmax - kmin +1;
+        lowklim = 10^kmin;
+
+    end
+
+    ks = zeros(logrange,1);
+    ks(1) = lowklim;
+    devarray = [];
+
+    for k = 2:logrange
+
+        ks(k) = 10^(kmin+(k-1));
+
+    end
+
+    %Retrieve Cu vs t Curve for comparison
+    [~, Cureal] = BuildCuPlot(y0,a1,a2,b1,b2,frames);
+
+    %Loop to Log Optimise k
+    for i = 1:logrange
+
+        i
+
+        if strcmp(kchoice,'k1') == 1
+
+            %Simulate using k1 array
+            Cuguess = SimFunctCuFeS2(ks(i),k2,Feslope,Hinitial,Hslope,totalt,frames,snap);
+
+        else
+
+            %Simulate using k2 array
+            Cuguess = SimFunctCuFeS2(k1,ks(i),Feslope,Hinitial,Hslope,totalt,frames,snap);
+
+        end
+
+        %Formulate Deviations
+        totdev = MeasureDeviations(Cureal, Cuguess);
+        devarray{end+1} =  totdev;
+
+    end
+
+    %Pick out lowest deviation k1
+    devmatk = cell2mat(devarray);
+    [smallestk, k1index] = min(abs(devmatk));
+
+    if devmatk(k1index) > 0
+
+        lowklim = ks(k1index);
+        highklim = ks(k1index+1);
+        range = highklim;
+
+    else
+
+        lowklim = ks(k1index-1);
+        highklim = ks(k1index);
+        range = highklim;
+
+    end
+
+    optk = highklim/2;
+
+end
