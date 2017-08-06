@@ -1,0 +1,18 @@
+function [time, Cudata] = BuildCuPlot(y0, a1, a2, b1, b2, totaltime, frames)
+
+    int = round(totaltime/frames);
+
+    Cu = @(e) (a1*exp(-e/b1)) + (a2*exp(-e/b2)) + y0;
+
+    time = zeros(frames,1);
+    Cudata = zeros(frames,1);
+
+    for i = 1:frames
+
+        t = int*i;
+        time(i) = t;
+        Cudata(i) = Cu(t);
+
+    end
+
+end
